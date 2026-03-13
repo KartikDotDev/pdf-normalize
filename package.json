@@ -1,0 +1,27 @@
+{
+  "name": "pdf-normalizer",
+  "version": "1.0.0",
+  "description": "Normalize messy PDFs for fast web delivery and reliable document ingestion.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.9.3"
+  },
+  "bin": {
+    "pdf-normalizer": "dist/cli.js"
+  }
+}
