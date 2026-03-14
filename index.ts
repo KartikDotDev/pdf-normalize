@@ -3,10 +3,11 @@ import { mkdtempSync, readFileSync, statSync, copyFileSync, rmSync, existsSync, 
 import { tmpdir } from 'os';
 import { join, resolve as pathResolve } from 'path';
 import { promisify } from 'util';
+import { ensureDependencies, whichBin } from './deps';
+
+export { ensureDependencies } from './deps';
 
 const execFileAsync = promisify(execFile);
-
-const INSTALL_DOCS_URL = 'https://github.com/KartikDotDev/pdf-normalizer#installation';
 
 export type NormalizeStatus = 'success' | 'partial' | 'hard_fail' | 'warning';
 
@@ -33,37 +34,20 @@ export interface NormalizeOptions {
   onProgress?: (step: string) => void;
 }
 
-function which(bin: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const cmd = process.platform === 'win32' ? 'where' : 'which';
-    const arg = process.platform === 'win32' ? bin : bin;
-    execFile(cmd, [arg], (err: Error | null) => resolve(!err));
-  });
-}
-
-export async function checkRequiredBinaries(): Promise<void> {
-  const missing: string[] = [];
-  if (!(await which('qpdf'))) missing.push('qpdf');
-  if (!(await which('gs'))) missing.push('gs (Ghostscript)');
-  const hasPdftotext = await which('pdftotext');
-  const hasMutool = await which('mutool');
-  if (!hasPdftotext && !hasMutool) missing.push('pdftotext (Poppler) or mutool (MuPDF)');
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing required tool(s): ${missing.join(', ')}. Install instructions: ${INSTALL_DOCS_URL}`
-    );
-  }
-}
-
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function run(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string; code: number }> {
+function run(
+  cmd: string,
+  args: string[],
+  opts?: { cwd?: string; env?: Record<string, string> }
+): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve) => {
-    const p = spawn(cmd, args, { cwd, shell: false });
+    const env = opts?.env ?? process.env;
+    const p = spawn(cmd, args, { cwd: opts?.cwd, env, shell: false });
     let stdout = '';
     let stderr = '';
     p.stdout?.on('data', (d: Buffer) => { stdout += d.toString(); });
@@ -72,9 +56,9 @@ function run(cmd: string, args: string[], cwd?: string): Promise<{ stdout: strin
   });
 }
 
-async function getPageCount(filePath: string): Promise<number> {
+async function getPageCount(filePath: string, env: Record<string, string | undefined>): Promise<number> {
   try {
-    const { stdout } = await execFileAsync('qpdf', ['--show-npages', filePath]);
+    const { stdout } = await execFileAsync('qpdf', ['--show-npages', filePath], { env });
     const n = parseInt(stdout.trim(), 10);
     return isNaN(n) ? 0 : n;
   } catch {
@@ -82,15 +66,19 @@ async function getPageCount(filePath: string): Promise<number> {
   }
 }
 
-async function detectTextLayer(filePath: string, backend: 'pdftotext' | 'mutool'): Promise<boolean> {
+async function detectTextLayer(
+  filePath: string,
+  backend: 'pdftotext' | 'mutool',
+  env: Record<string, string | undefined>
+): Promise<boolean> {
   const threshold = 50;
   try {
     if (backend === 'pdftotext') {
-      const { stdout } = await execFileAsync('pdftotext', [filePath, '-']);
+      const { stdout } = await execFileAsync('pdftotext', [filePath, '-'], { env });
       const nonWs = stdout.replace(/\s/g, '').length;
       return nonWs >= threshold;
     } else {
-      const { stdout } = await execFileAsync('mutool', ['draw', '-F', 'text', filePath]);
+      const { stdout } = await execFileAsync('mutool', ['draw', '-F', 'text', filePath], { env });
       const nonWs = stdout.replace(/\s/g, '').length;
       return nonWs >= threshold;
     }
@@ -108,9 +96,14 @@ export async function normalizePDF(
   if (!existsSync(resolvedInput)) {
     throw new Error(`File not found: ${resolvedInput}`);
   }
-  await checkRequiredBinaries();
+  const stat = statSync(resolvedInput);
+  if (!stat.isFile()) {
+    throw new Error(`Not a file: ${resolvedInput}`);
+  }
+  const { path: toolPath } = await ensureDependencies({ onProgress });
+  const env = { ...process.env, PATH: toolPath };
 
-  const tmpDir = mkdtempSync(join(tmpdir(), 'pdf-normalizer-'));
+  const tmpDir = mkdtempSync(join(tmpdir(), 'pdf-normalize-'));
   const base = join(tmpDir, 'stage');
   let current = base + '0.pdf';
   let next = base + '1.pdf';
@@ -126,7 +119,7 @@ export async function normalizePDF(
 
   try {
     onProgress('validate');
-    const checkResult = await run('qpdf', ['--check', current], tmpDir);
+    const checkResult = await run('qpdf', ['--check', current], { cwd: tmpDir, env });
     if (checkResult.code === 2) {
       status = 'hard_fail';
       reason = 'qpdf --check failed (file may be corrupt)';
@@ -145,7 +138,7 @@ export async function normalizePDF(
     }
 
     onProgress('repair');
-    const repairResult = await run('qpdf', [current, next], tmpDir);
+    const repairResult = await run('qpdf', [current, next], { cwd: tmpDir, env });
     if (repairResult.code === 2) {
       status = 'hard_fail';
       reason = 'qpdf repair failed';
@@ -166,7 +159,7 @@ export async function normalizePDF(
     const swap = current; current = next; next = swap;
 
     onProgress('linearize');
-    const linearizeResult = await run('qpdf', ['--linearize', current, next], tmpDir);
+    const linearizeResult = await run('qpdf', ['--linearize', current, next], { cwd: tmpDir, env });
     if (linearizeResult.code !== 0) {
       status = 'partial';
       skipped.push('linearize');
@@ -188,7 +181,7 @@ export async function normalizePDF(
         '-dBATCH',
         `-sOutputFile=${gsOut}`,
         current,
-      ], tmpDir);
+      ], { cwd: tmpDir, env });
       if (gsResult.code !== 0) throw new Error('gs failed');
       completed.push('compress');
       copyFileSync(gsOut, next);
@@ -199,11 +192,11 @@ export async function normalizePDF(
       reason = reason ?? 'compress: failed';
     }
 
-    const textBackend = options?.textDetectBackend ?? (await which('pdftotext') ? 'pdftotext' : 'mutool');
+    const textBackend = options?.textDetectBackend ?? (await whichBin('pdftotext', toolPath) ? 'pdftotext' : 'mutool');
     onProgress('text_detect');
-    textLayer = await detectTextLayer(current, textBackend);
+    textLayer = await detectTextLayer(current, textBackend, env);
 
-    const pages = await getPageCount(current);
+    const pages = await getPageCount(current, env);
     const sizeAfter = statSync(current).size;
     const metadata: Metadata = {
       status,

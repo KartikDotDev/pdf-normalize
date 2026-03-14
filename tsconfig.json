@@ -9,6 +9,6 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["index.ts", "cli.ts"],
+  "include": ["index.ts", "cli.ts", "deps.ts", "test/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -6,13 +6,16 @@ import { normalizePDF } from './index';
 const args = process.argv.slice(2);
 const inputPath = args[0];
 if (!inputPath) {
-  console.error('Usage: pdf-normalizer <file.pdf>');
+  console.error('Usage: pdf-normalize <file.pdf>');
   process.exit(1);
 }
 
 normalizePDF(inputPath, {
   onProgress: (step) => {
-    if (step === 'repair') console.log('✓ repaired');
+    if (step === 'Setting up PDF tools (one-time)...') console.log('Setting up PDF tools (one-time)...');
+    else if (step.startsWith('  ')) console.log(step);
+    else if (step === '✓ All set.') console.log('✓ All set. Normalizing...');
+    else if (step === 'repair') console.log('✓ repaired');
     else if (step === 'linearize') console.log('✓ linearized');
     else if (step === 'compress') console.log('✓ compressed');
   },

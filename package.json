@@ -1,18 +1,26 @@
 {
-  "name": "pdf-normalizer",
+  "name": "pdf-normalize",
   "version": "1.0.0",
   "description": "Normalize messy PDFs for fast web delivery and reliable document ingestion.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+  },
+  "files": ["dist/index.js", "dist/index.d.ts", "dist/cli.js", "dist/cli.d.ts", "dist/deps.js", "dist/deps.d.ts", "LICENSE"],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test:generate": "npm run build && node dist/test/generators/corrupt.js",
+    "test": "npm run test:generate && node dist/test/run-tests.js"
   },
-  "keywords": [],
+  "keywords": ["pdf", "normalize", "repair", "linearize", "compress", "qpdf", "ghostscript"],
   "author": "",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KartikDotDev/pdf-normalize.git"
+  },
   "engines": {
     "node": ">=18"
   },
@@ -22,6 +30,6 @@
     "typescript": "^5.9.3"
   },
   "bin": {
-    "pdf-normalizer": "dist/cli.js"
+    "pdf-normalize": "dist/cli.js"
   }
 }

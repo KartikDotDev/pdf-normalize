@@ -1,90 +1,67 @@
-# pdf-normalizer
+# pdf-normalize
 
-Normalize messy PDFs for fast web delivery and reliable document ingestion.
+Normalize messy PDFs for fast web delivery, reliable document ingestion, and AI/RAG pipelines.
+
+## What is normalization?
+
+**Normalization** turns inconsistent or broken PDFs into clean, predictable files. The pipeline:
+
+| Step | What it does | Benefit |
+|------|--------------|---------|
+| **Repair** | Fixes corrupt cross-reference tables, malformed objects, broken trailers | Unreadable files become parseable |
+| **Linearize** | Reorders bytes so the first page loads first (PDF "fast web view") | Faster perceived load in browsers |
+| **Compress** | Re-encodes with Ghostscript (ebook quality) | Smaller file size, standard structure |
+
+You get a single, compact PDF that behaves the same across viewers and tools—no more silent failures or random parser errors.
+
+## Why use it?
+
+**For AI and RAG pipelines:** LLMs and retrieval systems rely on reliable text extraction. Corrupt or non-standard PDFs cause extraction failures, empty chunks, or gibberish. pdf-normalize repairs and standardizes files so your ingestion pipeline sees a consistent format, fewer parse errors, and better-quality chunks.
+
+**For web delivery:** Linearized PDFs show the first page faster. Compressed files load quicker and cost less to store and serve.
+
+**For document workflows:** Batch-process scanned docs, emailed attachments, or legacy exports before archiving or OCR—one tool, one pipeline.
 
 ## Install
 
 ```bash
-npm install pdf-normalizer
-# or
-npx pdf-normalizer file.pdf
+npm install pdf-normalize
+# or run without installing
+npx pdf-normalize file.pdf
 ```
 
 ## System dependencies
 
-pdf-normalizer uses these command-line tools (they must be installed and on your PATH):
+Uses qpdf, Ghostscript, and Poppler (or MuPDF). On first run, missing tools are installed via your package manager (Homebrew on macOS, Scoop on Windows, apt/dnf on Linux). One-time setup only.
 
-- **qpdf** — repair and linearize
-- **gs** (Ghostscript) — compress
-- **pdftotext** (Poppler) or **mutool** (MuPDF) — text-layer detection
+If auto-install fails:
 
-We do not bundle them via npm. If any are missing, the CLI/library will exit with an error and point here.
-
-## Installation
-
-Install the tools for your platform, then use the package.
-
-### macOS (Homebrew)
-
-```bash
-brew install qpdf ghostscript poppler
-# or, for text detection with MuPDF instead of Poppler:
-brew install qpdf ghostscript mupdf
-```
-
-### Linux
-
-**Debian / Ubuntu (apt)**
-
-```bash
-sudo apt-get update
-sudo apt-get install qpdf ghostscript poppler-utils
-# or for MuPDF:
-sudo apt-get install qpdf ghostscript mupdf-tools
-```
-
-**Fedora / RHEL (dnf)**
-
-```bash
-sudo dnf install qpdf ghostscript poppler-utils
-# or for MuPDF:
-sudo dnf install qpdf ghostscript mupdf
-```
-
-### Windows
-
-- **qpdf:** [qpdf releases](https://github.com/qpdf/qpdf/releases) — add the `bin` folder to PATH.
-- **Ghostscript:** [Ghostscript downloads](https://ghostscript.com/releases/gsdnld.html) — install and add `gs` to PATH.
-- **Poppler (pdftotext):** [Poppler for Windows](https://github.com/oschwartz10612/poppler-windows/releases) — add `bin` to PATH.
-- **MuPDF (mutool):** [MuPDF downloads](https://mupdf.com/releases/) — add the directory containing `mutool` to PATH.
-
-Or with a package manager:
-
-- **Chocolatey:** `choco install qpdf gs poppler` (or use MuPDF if available).
-- **Scoop:** `scoop install qpdf ghostscript poppler` (or equivalent).
+- **macOS:** `brew install qpdf ghostscript poppler`
+- **Linux (apt):** `sudo apt-get update && sudo apt-get install -y qpdf ghostscript poppler-utils`
+- **Linux (dnf):** `sudo dnf install -y qpdf ghostscript poppler-utils`
+- **Windows (Scoop):** `scoop install qpdf ghostscript poppler`
 
 ## CLI
 
 ```bash
-npx pdf-normalizer path/to/file.pdf
+npx pdf-normalize path/to/file.pdf
 ```
 
 Writes `path/to/file.normalized.pdf` and prints progress (repaired, linearized, compressed).
 
+**Exit codes:** `0` success | `1` error (file not found, bad path) | `2` unrecoverable PDF (still writes best-effort output)
+
 ## Library
 
 ```ts
-import { normalizePDF, checkRequiredBinaries } from "pdf-normalizer";
-
-// Optional: check tools before running
-await checkRequiredBinaries();
+import { normalizePDF } from "pdf-normalize";
 
 const { pdf, metadata } = await normalizePDF("file.pdf");
 console.log(metadata);
 // { status: "success", pages: 22, size_before: "18.0 MB", size_after: "5.0 MB", linearized: true, text_layer: true }
 ```
 
-Write the result to a file:
+Write to a file:
 
 ```ts
 const { pdf } = await normalizePDF("file.pdf", { outputPath: "out/normalized.pdf" });
@@ -92,3 +69,7 @@ const { pdf } = await normalizePDF("file.pdf", { outputPath: "out/normalized.pdf
 const { pdf } = await normalizePDF("file.pdf");
 require("fs").writeFileSync("out/normalized.pdf", pdf);
 ```
+
+## License
+
+ISC
