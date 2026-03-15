@@ -40,6 +40,13 @@ function getScoopShimsPath(): string {
   return home ? `${home}\\scoop\\shims` : '';
 }
 
+function getScoopExePath(): string | null {
+  const scoopShimsPath = getScoopShimsPath();
+  if (!scoopShimsPath) return null;
+  const scoopCmd = `${scoopShimsPath}\\scoop.cmd`;
+  return existsSync(scoopCmd) ? scoopCmd : null;
+}
+
 async function getToolPaths(plat: string): Promise<string> {
   if (plat === 'darwin') {
     const prefix = await getBrewPrefix();
@@ -173,12 +180,22 @@ export async function ensureDependencies(
           `Couldn't install tools automatically. Run this in PowerShell, then try again:\n  irm get.scoop.sh | iex\n  scoop install qpdf ghostscript poppler`
         );
       }
+      const scoopExeAfterInstall = getScoopExePath();
+      if (!scoopExeAfterInstall) {
+        throw new Error(
+          `Scoop was installed but scoop.cmd was not found. Open a new PowerShell window and run:\n  scoop install qpdf ghostscript poppler`
+        );
+      }
     }
     onProgress('  Installing qpdf, ghostscript, poppler...');
     const scoopPath = getScoopShimsPath();
     const winPath = process.env.PATH ?? '';
     const pathWithScoop = scoopPath ? `${scoopPath}${delimiter}${winPath}` : winPath;
-    const code = await runInstall('scoop', ['install', 'qpdf', 'ghostscript', 'poppler'], { env: { ...process.env, PATH: pathWithScoop } });
+    const scoopExe = getScoopExePath();
+    const scoopEnv = { ...process.env, PATH: pathWithScoop };
+    const code = scoopExe
+      ? await runInstall(scoopExe, ['install', 'qpdf', 'ghostscript', 'poppler'], { shell: true, env: scoopEnv })
+      : await runInstall('scoop', ['install', 'qpdf', 'ghostscript', 'poppler'], { shell: true, env: scoopEnv });
     if (code !== 0) {
       throw new Error(
         `Couldn't install tools automatically. Run this, then try again:\n  scoop install qpdf ghostscript poppler`
