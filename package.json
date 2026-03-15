@@ -1,20 +1,39 @@
 {
   "name": "pdf-normalize",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Normalize messy PDFs for fast web delivery and reliable document ingestion.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
-  "files": ["dist/index.js", "dist/index.d.ts", "dist/cli.js", "dist/cli.d.ts", "dist/deps.js", "dist/deps.d.ts", "LICENSE"],
+  "files": [
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/cli.js",
+    "dist/cli.d.ts",
+    "dist/deps.js",
+    "dist/deps.d.ts",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "test:generate": "npm run build && node dist/test/generators/corrupt.js",
     "test": "npm run test:generate && node dist/test/run-tests.js"
   },
-  "keywords": ["pdf", "normalize", "repair", "linearize", "compress", "qpdf", "ghostscript"],
+  "keywords": [
+    "pdf",
+    "normalize",
+    "repair",
+    "linearize",
+    "compress",
+    "qpdf",
+    "ghostscript"
+  ],
   "author": "",
   "license": "ISC",
   "repository": {
