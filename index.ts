@@ -88,28 +88,36 @@ async function detectTextLayer(
 }
 
 export async function normalizePDF(
-  inputPath: string,
+  input: string | Buffer,
   options?: NormalizeOptions
 ): Promise<NormalizeResult> {
   const onProgress = options?.onProgress ?? (() => {});
-  const resolvedInput = pathResolve(inputPath);
-  if (!existsSync(resolvedInput)) {
-    throw new Error(`File not found: ${resolvedInput}`);
-  }
-  const stat = statSync(resolvedInput);
-  if (!stat.isFile()) {
-    throw new Error(`Not a file: ${resolvedInput}`);
-  }
-  const { path: toolPath } = await ensureDependencies({ onProgress });
-  const env = { ...process.env, PATH: toolPath };
-
+  let sizeBefore: number;
   const tmpDir = mkdtempSync(join(tmpdir(), 'pdf-normalize-'));
   const base = join(tmpDir, 'stage');
   let current = base + '0.pdf';
   let next = base + '1.pdf';
-  copyFileSync(resolvedInput, current);
 
-  const sizeBefore = statSync(resolvedInput).size;
+  if (Buffer.isBuffer(input)) {
+    sizeBefore = input.length;
+    writeFileSync(current, input);
+  } else {
+    const resolvedInput = pathResolve(input);
+    if (!existsSync(resolvedInput)) {
+      rmSync(tmpDir, { recursive: true, force: true });
+      throw new Error(`File not found: ${resolvedInput}`);
+    }
+    const stat = statSync(resolvedInput);
+    if (!stat.isFile()) {
+      rmSync(tmpDir, { recursive: true, force: true });
+      throw new Error(`Not a file: ${resolvedInput}`);
+    }
+    sizeBefore = stat.size;
+    copyFileSync(resolvedInput, current);
+  }
+
+  const { path: toolPath } = await ensureDependencies({ onProgress });
+  const env = { ...process.env, PATH: toolPath };
   const completed: string[] = [];
   const skipped: string[] = [];
   let status: NormalizeStatus = 'success';

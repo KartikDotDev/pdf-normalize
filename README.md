@@ -49,7 +49,45 @@ npx pdf-normalize path/to/file.pdf
 
 Writes `path/to/file.normalized.pdf` and prints progress (repaired, linearized, compressed).
 
+**Pipeline usage (stdin/stdout):**
+
+```bash
+cat file.pdf | pdf-normalize --stdin --stdout > normalized.pdf
+pdf-normalize file.pdf --stdout | pdftotext - -
+```
+
+**Options:**
+- `--stdin` Read PDF from stdin
+- `--stdout` Write normalized PDF to stdout (single input only)
+- `--out-dir <dir>` Write outputs to directory (for multiple files)
+- `--quiet`, `-q` Suppress progress messages
+
+**Examples:**
+```bash
+pdf-normalize *.pdf --out-dir normalized/
+pdf-normalize contract.pdf --stdout | embedding-tool
+```
+
 **Exit codes:** `0` success | `1` error (file not found, bad path) | `2` unrecoverable PDF (still writes best-effort output)
+
+## Using in RAG pipelines
+
+Most RAG pipelines struggle with messy PDFs. Use pdf-normalize as a pre-step so text extraction and embedding work reliably:
+
+```
+PDF → Normalize → Extract Text → Embed → RAG
+```
+
+```bash
+pdf-normalize contract.pdf > clean.pdf
+pdftotext clean.pdf | embedding-tool
+```
+
+Or pipe directly:
+
+```bash
+pdf-normalize document.pdf --stdout | pdftotext - - | your-rag-ingest
+```
 
 ## Library
 
@@ -68,6 +106,13 @@ const { pdf } = await normalizePDF("file.pdf", { outputPath: "out/normalized.pdf
 // or
 const { pdf } = await normalizePDF("file.pdf");
 require("fs").writeFileSync("out/normalized.pdf", pdf);
+```
+
+Buffer input (for in-memory pipelines, e.g. fetch or streams):
+
+```ts
+const pdfBuffer = await fetch(url).then(r => r.arrayBuffer()).then(ab => Buffer.from(ab));
+const { pdf } = await normalizePDF(pdfBuffer, { outputPath: "out/normalized.pdf" });
 ```
 
 ## License
